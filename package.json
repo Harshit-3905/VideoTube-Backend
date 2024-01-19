@@ -1,0 +1,11 @@
+{
+  "name": "videotube-backend",
+  "version": "1.0.0",
+  "description": "backend for videotube - youtube clone",
+  "main": "server.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Harshit Joshi",
+  "license": "ISC"
+}
