@@ -2,8 +2,12 @@ import asyncHandler from "../utils/asyncHandler.js";
 import ApiError from "../utils/ApiError.js";
 import ApiResponse from "../utils/ApiResponse.js";
 import { User } from "../models/user.model.js";
-import { uploadOnCloudinary } from "../utils/cloudinary.js";
+import {
+    uploadOnCloudinary,
+    deleteFromCloudinary,
+} from "../utils/cloudinary.js";
 import jwt from "jsonwebtoken";
+import mongoose from "mongoose";
 
 const generateAccessAndRefreshTokens = async (userId) => {
     try {
@@ -106,9 +110,7 @@ const loginUser = asyncHandler(async (req, res) => {
         .json(
             new ApiResponse(
                 200,
-                loggedInUser,
-                accessToken,
-                refreshToken,
+                { loggedInUser, accessToken, refreshToken },
                 "User Logged In Successfully"
             )
         );
@@ -118,7 +120,7 @@ const logoutUser = asyncHandler(async (req, res) => {
     const userId = req.user._id;
     await User.findByIdAndUpdate(
         { _id: userId },
-        { refreshToken: undefined },
+        { $unset: { refreshToken: 1 } },
         { new: true }
     );
 
@@ -135,7 +137,7 @@ const logoutUser = asyncHandler(async (req, res) => {
 
 const refreshAccessToken = asyncHandler(async (req, res) => {
     const incomingRefreshToken =
-        req.cookies.accessToken || req.body.refreshToken;
+        req.cookies.refreshToken || req.body.refreshToken;
     if (!incomingRefreshToken) {
         throw new ApiError(401, "Unauthorized Access");
     }
@@ -148,8 +150,6 @@ const refreshAccessToken = asyncHandler(async (req, res) => {
         if (!user) {
             throw new ApiError(401, "Invalid Refresh Token");
         }
-        console.log(user.refreshToken);
-        console.log(incomingRefreshToken);
         if (user.refreshToken !== incomingRefreshToken) {
             throw new ApiError(401, "Refresh Token Mismatch");
         }
@@ -201,6 +201,14 @@ const updateAccountDetails = asyncHandler(async (req, res) => {
     if (!fullname && !email) {
         throw new ApiError(400, "Missing Required Fields");
     }
+    if (email) {
+        const existedUser = await User.findOne({
+            email,
+        });
+        if (existedUser) {
+            throw new ApiError(409, "Email already exists");
+        }
+    }
     const user = await User.findByIdAndUpdate(
         req.user?._id,
         {
@@ -225,6 +233,7 @@ const updateAvatar = asyncHandler(async (req, res) => {
     if (!avatar) {
         throw new ApiError(500, "Error Uploading Avatar");
     }
+    await deleteFromCloudinary(req.user?.avatar);
     const user = await User.findByIdAndUpdate(
         req.user?._id,
         {
@@ -245,9 +254,10 @@ const updateCoverImage = asyncHandler(async (req, res) => {
         throw new ApiError(400, "Cover Image File Required");
     }
     const coverImage = await uploadOnCloudinary(coverImageLocalPath);
-    if (!avatar) {
+    if (!coverImage) {
         throw new ApiError(500, "Error Uploading Cover Image");
     }
+    await deleteFromCloudinary(req.user?.coverImage);
     const user = await User.findByIdAndUpdate(
         req.user?._id,
         {
@@ -313,8 +323,6 @@ const getUserChannelProfile = asyncHandler(async (req, res) => {
                 isSubscribed: 1,
                 avatar: 1,
                 coverImage: 1,
-                subscribers: 0,
-                subscribedTo: 0,
             },
         },
     ]);
