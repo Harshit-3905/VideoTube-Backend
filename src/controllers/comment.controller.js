@@ -7,6 +7,16 @@ import mongoose from "mongoose";
 
 const getVideoComments = asyncHandler(async (req, res) => {
     //TODO: pagination
+    const { videoId } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(videoId))
+        throw new ApiError(400, "Invalid Video ID");
+    const comments = await Comment.find({ video: videoId })
+        .populate("owner", {
+            username: 1,
+            avatar: 1,
+        })
+        .select("-video");
+    res.status(200).json(new ApiResonse(200, comments, "Comments fetched"));
 });
 
 const addComment = asyncHandler(async (req, res) => {
@@ -15,7 +25,7 @@ const addComment = asyncHandler(async (req, res) => {
     const { _id } = req.user;
     if (!mongoose.Types.ObjectId.isValid(videoId))
         throw new ApiError(400, "Invalid Video ID");
-    if (content.length === 0)
+    if (content.trim() === "")
         throw new ApiError(400, "Comment cannot be empty");
     const video = await Video.findById(videoId);
     if (!video) throw new ApiError(404, "Video not found");
