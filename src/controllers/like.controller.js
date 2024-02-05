@@ -44,9 +44,19 @@ const toggleTweetLike = asyncHandler(async (req, res) => {
 
 const getLikedVideos = asyncHandler(async (req, res) => {
     const { _id } = req.user;
-    const likes = await Like.find({ likedBy: _id }).populate("video");
+    const likes = await Like.find({
+        likedBy: _id,
+        video: { $ne: null },
+    }).populate({
+        path: "video",
+        select: "title thumbnail views owner",
+        populate: {
+            path: "owner",
+            select: "username avatar",
+        },
+    });
     if (!likes) throw new ApiError(500, "Something went wrong");
-    res.status(200).json(new ApiResponse(200, likes, "Liked videos"));
+    res.status(200).json(new ApiResponse(200, likes, "Fetched Liked videos"));
 });
 
 export { toggleVideoLike, toggleCommentLike, toggleTweetLike, getLikedVideos };
