@@ -10,6 +10,11 @@ import mongoose from "mongoose";
 
 const getAllVideos = asyncHandler(async (req, res) => {
     //TODO: Pagination
+    const videos = await Video.find({ isPublished: true }).populate("owner", {
+        username: 1,
+        avatar: 1,
+    });
+    res.status(200).json(new ApiResonse(200, videos, "Videos found"));
 });
 
 const getVideoById = asyncHandler(async (req, res) => {
@@ -58,6 +63,7 @@ const deleteVideo = asyncHandler(async (req, res) => {
         throw new ApiError(403, "You are not authorized to delete this video");
     }
     await Video.findByIdAndDelete(videoId);
+    await deleteFromCloudinary(video.thumbnail);
     await deleteFromCloudinary(video.videoFile);
     res.status(200).json(
         new ApiResonse(200, null, "Video Deleted Successfully")
