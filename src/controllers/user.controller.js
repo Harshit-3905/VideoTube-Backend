@@ -37,7 +37,12 @@ const registerUser = asyncHandler(async (req, res) => {
     if (existedUser) {
         throw new ApiError(409, "Email or Username already exists");
     }
-    const avatarLocalPath = req.files?.avatar[0]?.path;
+    let avatarLocalPath;
+    if (req.files?.avatar && req.files?.avatar.length > 0) {
+        avatarLocalPath = req.files.avatar[0].path;
+    } else {
+        throw new ApiError(400, "Avatar File Required");
+    }
     let coverImageLocalPath;
     if (req.files?.coverImage && req.files?.coverImage.length > 0) {
         coverImageLocalPath = req.files.coverImage[0].path;
@@ -178,6 +183,15 @@ const refreshAccessToken = asyncHandler(async (req, res) => {
 
 const changeCurrentPassword = asyncHandler(async (req, res) => {
     const { oldPassword, newPassword } = req.body;
+    if (!oldPassword || !newPassword) {
+        throw new ApiError(400, "Missing Required Fields");
+    }
+    if (oldPassword === newPassword) {
+        throw new ApiError(
+            400,
+            "New Password cannot be the same as Old Password"
+        );
+    }
     const user = await User.findById(req.user?._id);
     const isPasswordCorrect = await user.isPasswordCorrect(oldPassword);
     if (!isPasswordCorrect) {
