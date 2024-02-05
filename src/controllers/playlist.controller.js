@@ -21,7 +21,11 @@ const getPlaylistById = asyncHandler(async (req, res) => {
     const { playlistId } = req.params;
     if (!mongoose.isValidObjectId(playlistId))
         throw new ApiError(400, "Invalid Playlist Id");
-    const playlist = await Playlist.findById(playlistId).populate("videos");
+    const playlist = await Playlist.findById(playlistId).populate({
+        path: "videos",
+        select: "title thumbnail owner",
+        populate: { path: "owner", select: "username avatar" },
+    });
     if (!playlist) throw new ApiError(404, "Playlist Not Found");
     return res
         .status(200)
@@ -104,7 +108,11 @@ const getUserPlaylists = asyncHandler(async (req, res) => {
     const { userId } = req.params;
     if (!mongoose.isValidObjectId(userId))
         throw new ApiError(400, "Invalid User Id");
-    const playlists = await Playlist.find({ owner: userId }).populate("videos");
+    const playlists = await Playlist.find({ owner: userId }).populate({
+        path: "videos",
+        select: "title thumbnail owner",
+        populate: { path: "owner", select: "username avatar" },
+    });
     return res
         .status(200)
         .json(new ApiResonse(200, playlists, "Playlists Fetched Successfully"));
