@@ -1,6 +1,7 @@
 import ApiError from "../utils/ApiError.js";
 import ApiResonse from "../utils/ApiResponse.js";
 import asyncHandler from "../utils/asyncHandler.js";
+import { User } from "../models/user.model.js";
 import { Tweet } from "../models/tweet.model.js";
 import mongoose from "mongoose";
 
@@ -19,11 +20,12 @@ const createTweet = asyncHandler(async (req, res) => {
 });
 
 const getUserTweets = asyncHandler(async (req, res) => {
-    let { userId } = req.params;
-    if (!mongoose.Types.ObjectId.isValid(userId)) {
-        throw new ApiError(400, "Invalid User ID");
+    let { username } = req.params;
+    const user = await User.findOne({ username });
+    if (!user) {
+        throw new ApiError(404, "User not found");
     }
-    userId = new mongoose.Types.ObjectId(userId);
+    const userId = user._id;
     const tweets = await Tweet.find({ owner: userId });
     return res
         .status(200)
