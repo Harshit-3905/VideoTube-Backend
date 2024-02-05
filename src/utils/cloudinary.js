@@ -29,7 +29,17 @@ const deleteFromCloudinary = async (url) => {
         const parts = url.split("/");
         const idWithExtension = parts[parts.length - 1];
         const public_id = idWithExtension.split(".")[0];
-        const res = await cloudinary.uploader.destroy(public_id);
+        let resource_type = "image";
+        if (
+            idWithExtension.includes("mp4") ||
+            idWithExtension.includes("webm") ||
+            idWithExtension.includes("mkv")
+        ) {
+            resource_type = "video";
+        }
+        const res = await cloudinary.uploader.destroy(public_id, {
+            resource_type,
+        });
         return res;
     } catch (error) {
         console.log(error);
