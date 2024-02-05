@@ -7,6 +7,7 @@ import {
     deleteFromCloudinary,
 } from "../utils/cloudinary.js";
 import mongoose from "mongoose";
+import { User } from "../models/user.model.js";
 
 const getAllVideos = asyncHandler(async (req, res) => {
     //TODO: Pagination
@@ -22,10 +23,19 @@ const getVideoById = asyncHandler(async (req, res) => {
     if (!mongoose.Types.ObjectId.isValid(videoId)) {
         throw new ApiError(400, "Invalid Video Id");
     }
-    const video = await Video.findById(videoId);
+    const video = await Video.findById(videoId).populate("owner", {
+        username: 1,
+        avatar: 1,
+    });
     if (!video) throw new ApiError(404, "Video not found");
-    video.views += 1;
-    await video.save();
+    const watchHistory = req.user.watchHistory;
+    if (!watchHistory.includes(videoId)) {
+        const user = await User.findById(req.user._id);
+        user.watchHistory.push(videoId);
+        video.views += 1;
+        await video.save();
+        await user.save();
+    }
     res.status(200).json(new ApiResonse(200, video, "Video found"));
 });
 
