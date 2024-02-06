@@ -10,11 +10,16 @@ import mongoose from "mongoose";
 import { User } from "../models/user.model.js";
 
 const getAllVideos = asyncHandler(async (req, res) => {
-    //TODO: Pagination
-    const videos = await Video.find({ isPublished: true }).populate("owner", {
-        username: 1,
-        avatar: 1,
-    });
+    const page = parseInt(req.query.page, 10) || 1;
+    const limit = parseInt(req.query.limit, 10) || 10;
+    const skip = (page - 1) * limit;
+    const videos = await Video.find({ isPublished: true })
+        .skip(skip)
+        .limit(limit)
+        .populate("owner", {
+            username: 1,
+            avatar: 1,
+        });
     res.status(200).json(new ApiResonse(200, videos, "Videos found"));
 });
 
