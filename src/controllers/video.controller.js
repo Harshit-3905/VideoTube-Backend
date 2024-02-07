@@ -12,6 +12,8 @@ import { User } from "../models/user.model.js";
 const getAllVideos = asyncHandler(async (req, res) => {
     const page = parseInt(req.query.page, 10) || 1;
     const limit = parseInt(req.query.limit, 10) || 10;
+    if (page < 1) throw new ApiError(400, "Invalid page number");
+    if (limit < 1) throw new ApiError(400, "Invalid limit number");
     const skip = (page - 1) * limit;
     const videos = await Video.find({ isPublished: true })
         .skip(skip)

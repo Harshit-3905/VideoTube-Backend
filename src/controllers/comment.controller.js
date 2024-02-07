@@ -6,11 +6,17 @@ import { Comment } from "../models/comment.model.js";
 import mongoose from "mongoose";
 
 const getVideoComments = asyncHandler(async (req, res) => {
-    //TODO: pagination
     const { videoId } = req.params;
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    if (page < 1) throw new ApiError(400, "Invalid page number");
+    if (limit < 1) throw new ApiError(400, "Invalid limit number");
+    const skip = (page - 1) * limit;
     if (!mongoose.Types.ObjectId.isValid(videoId))
         throw new ApiError(400, "Invalid Video ID");
     const comments = await Comment.find({ video: videoId })
+        .skip(skip)
+        .limit(limit)
         .populate("owner", {
             username: 1,
             avatar: 1,
