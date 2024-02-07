@@ -44,17 +44,25 @@ const toggleTweetLike = asyncHandler(async (req, res) => {
 
 const getLikedVideos = asyncHandler(async (req, res) => {
     const { _id } = req.user;
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    if (page < 1) throw new ApiError(400, "Invalid page number");
+    if (limit < 1) throw new ApiError(400, "Invalid limit number");
+    const skip = (page - 1) * limit;
     const likes = await Like.find({
         likedBy: _id,
         video: { $ne: null },
-    }).populate({
-        path: "video",
-        select: "title thumbnail views owner",
-        populate: {
-            path: "owner",
-            select: "username avatar",
-        },
-    });
+    })
+        .skip(skip)
+        .limit(limit)
+        .populate({
+            path: "video",
+            select: "title thumbnail views owner",
+            populate: {
+                path: "owner",
+                select: "username avatar",
+            },
+        });
     if (!likes) throw new ApiError(500, "Something went wrong");
     res.status(200).json(new ApiResponse(200, likes, "Fetched Liked videos"));
 });

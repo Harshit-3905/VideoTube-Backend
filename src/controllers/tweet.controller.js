@@ -21,12 +21,17 @@ const createTweet = asyncHandler(async (req, res) => {
 
 const getUserTweets = asyncHandler(async (req, res) => {
     let { username } = req.params;
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    if (page < 1) throw new ApiError(400, "Invalid page number");
+    if (limit < 1) throw new ApiError(400, "Invalid limit number");
+    const skip = (page - 1) * limit;
     const user = await User.findOne({ username });
     if (!user) {
         throw new ApiError(404, "User not found");
     }
     const userId = user._id;
-    const tweets = await Tweet.find({ owner: userId });
+    const tweets = await Tweet.find({ owner: userId }).skip(skip).limit(limit);
     return res
         .status(200)
         .json(new ApiResonse(200, tweets || [], "Tweets fetched successfully"));

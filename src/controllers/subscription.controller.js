@@ -5,7 +5,14 @@ import { Subscription } from "../models/subscription.model.js";
 
 const getSubscribedChannels = asyncHandler(async (req, res) => {
     const userId = req.user._id;
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    if (page < 1) throw new ApiError(400, "Invalid page number");
+    if (limit < 1) throw new ApiError(400, "Invalid limit number");
+    const skip = (page - 1) * limit;
     const subscriptions = await Subscription.find({ subscriber: userId })
+        .skip(skip)
+        .limit(limit)
         .populate("channel", "username avatar")
         .select("-subscriber");
     if (!subscriptions) throw new ApiError(404, "No subscriptions found");
@@ -42,9 +49,16 @@ const toggleSubscription = asyncHandler(async (req, res) => {
 
 const getUserChannelSubscribers = asyncHandler(async (req, res) => {
     const { channelId } = req.params;
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    if (page < 1) throw new ApiError(400, "Invalid page number");
+    if (limit < 1) throw new ApiError(400, "Invalid limit number");
+    const skip = (page - 1) * limit;
     const subscriptions = await Subscription.find({
         channel: channelId,
     })
+        .skip(skip)
+        .limit(limit)
         .populate("subscriber", "username avatar")
         .select("-channel");
     if (!subscriptions) throw new ApiError(404, "No subscriptions found");
