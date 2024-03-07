@@ -4,6 +4,7 @@ import asyncHandler from "../utils/asyncHandler.js";
 import { User } from "../models/user.model.js";
 import { Tweet } from "../models/tweet.model.js";
 import mongoose from "mongoose";
+import { redisClient } from "../utils/redis.js";
 
 const createTweet = asyncHandler(async (req, res) => {
     const { content } = req.body;
@@ -26,12 +27,35 @@ const getUserTweets = asyncHandler(async (req, res) => {
     if (page < 1) throw new ApiError(400, "Invalid page number");
     if (limit < 1) throw new ApiError(400, "Invalid limit number");
     const skip = (page - 1) * limit;
+    const allTweets = await redisClient.get(
+        `tweets:${username}:${page}:${limit}`
+    );
+    if (allTweets) {
+        return res
+            .status(200)
+            .json(
+                new ApiResonse(
+                    200,
+                    JSON.parse(allTweets),
+                    "Tweets fetched successfully"
+                )
+            );
+    }
     const user = await User.findOne({ username });
     if (!user) {
         throw new ApiError(404, "User not found");
     }
     const userId = user._id;
     const tweets = await Tweet.find({ owner: userId }).skip(skip).limit(limit);
+    if (!tweets) {
+        throw new ApiError(500, "Something went wrong");
+    }
+    await redisClient.set(
+        `tweets:${username}:${page}:${limit}`,
+        JSON.stringify(tweets),
+        "EX",
+        60
+    );
     return res
         .status(200)
         .json(new ApiResonse(200, tweets || [], "Tweets fetched successfully"));

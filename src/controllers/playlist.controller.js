@@ -3,6 +3,7 @@ import ApiResonse from "../utils/ApiResponse.js";
 import asyncHandler from "../utils/asyncHandler.js";
 import { Playlist } from "../models/playlist.model.js";
 import mongoose from "mongoose";
+import { redisClient } from "../utils/redis.js";
 
 const createPlaylist = asyncHandler(async (req, res) => {
     const { name, description } = req.body;
@@ -21,12 +22,23 @@ const getPlaylistById = asyncHandler(async (req, res) => {
     const { playlistId } = req.params;
     if (!mongoose.isValidObjectId(playlistId))
         throw new ApiError(400, "Invalid Playlist Id");
+    const key = `playlist:${playlistId}`;
+    const cached = await redisClient.get(key);
+    if (cached) {
+        const playlist = JSON.parse(cached);
+        return res
+            .status(200)
+            .json(
+                new ApiResonse(200, playlist, "Playlist Fetched Successfully")
+            );
+    }
     const playlist = await Playlist.findById(playlistId).populate({
         path: "videos",
         select: "title thumbnail owner",
         populate: { path: "owner", select: "username avatar" },
     });
     if (!playlist) throw new ApiError(404, "Playlist Not Found");
+    await redisClient.set(key, JSON.stringify(playlist), "EX", 60);
     return res
         .status(200)
         .json(new ApiResonse(200, playlist, "Playlist Fetched Successfully"));
@@ -108,11 +120,23 @@ const getUserPlaylists = asyncHandler(async (req, res) => {
     const { userId } = req.params;
     if (!mongoose.isValidObjectId(userId))
         throw new ApiError(400, "Invalid User Id");
+    const key = `userPlaylists:${userId}`;
+    const cached = await redisClient.get(key);
+    if (cached) {
+        const playlists = JSON.parse(cached);
+        return res
+            .status(200)
+            .json(
+                new ApiResonse(200, playlists, "Playlists Fetched Successfully")
+            );
+    }
     const playlists = await Playlist.find({ owner: userId }).populate({
         path: "videos",
         select: "title thumbnail owner",
         populate: { path: "owner", select: "username avatar" },
     });
+    if (!playlists) throw new ApiError(404, "Playlists Not Found");
+    await redisClient.set(key, JSON.stringify(playlists), "EX", 60);
     return res
         .status(200)
         .json(new ApiResonse(200, playlists, "Playlists Fetched Successfully"));

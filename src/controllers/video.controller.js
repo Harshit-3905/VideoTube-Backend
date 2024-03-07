@@ -8,12 +8,23 @@ import {
 } from "../utils/cloudinary.js";
 import mongoose from "mongoose";
 import { User } from "../models/user.model.js";
+import { redisClient } from "../utils/redis.js";
 
 const getAllVideos = asyncHandler(async (req, res) => {
     const page = parseInt(req.query.page, 10) || 1;
     const limit = parseInt(req.query.limit, 10) || 10;
     if (page < 1) throw new ApiError(400, "Invalid page number");
     if (limit < 1) throw new ApiError(400, "Invalid limit number");
+    const key = `videos:${page}:${limit}`;
+    const cached = await redisClient.get(key);
+    if (cached) {
+        const videos = JSON.parse(cached);
+        return res
+            .status(200)
+            .json(
+                new ApiResonse(200, { videos }, "Videos fetched successfully")
+            );
+    }
     const skip = (page - 1) * limit;
     const videos = await Video.find({ isPublished: true })
         .skip(skip)
@@ -22,6 +33,8 @@ const getAllVideos = asyncHandler(async (req, res) => {
             username: 1,
             avatar: 1,
         });
+    if (!videos) throw new ApiError(404, "No videos found");
+    await redisClient.set(key, JSON.stringify(videos), "EX", 60);
     res.status(200).json(new ApiResonse(200, videos, "Videos found"));
 });
 
@@ -29,6 +42,14 @@ const getVideoById = asyncHandler(async (req, res) => {
     const { videoId } = req.params;
     if (!mongoose.Types.ObjectId.isValid(videoId)) {
         throw new ApiError(400, "Invalid Video Id");
+    }
+    const key = `video:${videoId}`;
+    const cached = await redisClient.get(key);
+    if (cached) {
+        const video = JSON.parse(cached);
+        return res
+            .status(200)
+            .json(new ApiResonse(200, video, "Video fetched successfully"));
     }
     const video = await Video.findById(videoId).populate("owner", {
         username: 1,
@@ -43,6 +64,7 @@ const getVideoById = asyncHandler(async (req, res) => {
         await video.save();
         await user.save();
     }
+    await redisClient.set(key, JSON.stringify(video), "EX", 60);
     res.status(200).json(new ApiResonse(200, video, "Video found"));
 });
 

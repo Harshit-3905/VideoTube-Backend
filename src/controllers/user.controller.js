@@ -8,6 +8,7 @@ import {
 } from "../utils/cloudinary.js";
 import jwt from "jsonwebtoken";
 import mongoose from "mongoose";
+import { redisClient } from "../utils/redis.js";
 
 const generateAccessAndRefreshTokens = async (userId) => {
     try {
@@ -288,6 +289,18 @@ const updateCoverImage = asyncHandler(async (req, res) => {
 
 const getUserChannelProfile = asyncHandler(async (req, res) => {
     const { username } = req.params;
+    const user = await redisClient.get(`userchannelprofile:${username}`);
+    if (user) {
+        return res
+            .status(200)
+            .json(
+                new ApiResponse(
+                    200,
+                    JSON.parse(user),
+                    "Channel Fetched Successfully"
+                )
+            );
+    }
     if (!username?.trim()) {
         throw new ApiError(400, "Username Required");
     }
@@ -343,12 +356,29 @@ const getUserChannelProfile = asyncHandler(async (req, res) => {
     if (!channel?.length) {
         throw new ApiError(404, "Channel Not Found");
     }
+    redisClient.setex(
+        `userchannelprofile:${username}`,
+        3600,
+        JSON.stringify(channel[0])
+    );
     return res
         .status(200)
         .json(new ApiResponse(200, channel[0], "Channel Fetched Successfully"));
 });
 
 const getWatchHistory = asyncHandler(async (req, res) => {
+    const watchHistory = await redisClient.get(`watchhistory:${req.user._id}`);
+    if (watchHistory) {
+        return res
+            .status(200)
+            .json(
+                new ApiResponse(
+                    200,
+                    JSON.parse(watchHistory),
+                    "Watch History Fetched Successfully"
+                )
+            );
+    }
     const user = await User.aggregate([
         {
             $match: {
@@ -390,6 +420,14 @@ const getWatchHistory = asyncHandler(async (req, res) => {
             },
         },
     ]);
+    if (!user?.length) {
+        throw new ApiError(404, "User Not Found");
+    }
+    redisClient.setex(
+        `watchhistory:${req.user._id}`,
+        3600,
+        JSON.stringify(user[0].watchHistory)
+    );
     res.status(200).json(
         new ApiResponse(
             200,

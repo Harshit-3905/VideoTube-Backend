@@ -2,13 +2,27 @@ import ApiError from "../utils/ApiError.js";
 import ApiResonse from "../utils/ApiResponse.js";
 import asyncHandler from "../utils/asyncHandler.js";
 import { Subscription } from "../models/subscription.model.js";
-
+import { redisClient } from "../utils/redis.js";
 const getSubscribedChannels = asyncHandler(async (req, res) => {
     const userId = req.user._id;
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
     if (page < 1) throw new ApiError(400, "Invalid page number");
     if (limit < 1) throw new ApiError(400, "Invalid limit number");
+    const key = `subscriptions:${userId}:${page}:${limit}`;
+    const cached = await redisClient.get(key);
+    if (cached) {
+        const subscriptions = JSON.parse(cached);
+        return res
+            .status(200)
+            .json(
+                new ApiResonse(
+                    200,
+                    { subscriptions },
+                    "Subscriptions fetched successfully"
+                )
+            );
+    }
     const skip = (page - 1) * limit;
     const subscriptions = await Subscription.find({ subscriber: userId })
         .skip(skip)
@@ -16,6 +30,7 @@ const getSubscribedChannels = asyncHandler(async (req, res) => {
         .populate("channel", "username avatar")
         .select("-subscriber");
     if (!subscriptions) throw new ApiError(404, "No subscriptions found");
+    await redisClient.set(key, JSON.stringify(subscriptions), "EX", 60);
     res.status(200).json(
         new ApiResonse(
             200,
@@ -53,6 +68,20 @@ const getUserChannelSubscribers = asyncHandler(async (req, res) => {
     const limit = parseInt(req.query.limit) || 10;
     if (page < 1) throw new ApiError(400, "Invalid page number");
     if (limit < 1) throw new ApiError(400, "Invalid limit number");
+    const key = `channelSubscribers:${channelId}:${page}:${limit}`;
+    const cached = await redisClient.get(key);
+    if (cached) {
+        const subscriptions = JSON.parse(cached);
+        return res
+            .status(200)
+            .json(
+                new ApiResonse(
+                    200,
+                    { subscriptions },
+                    "Subscriptions fetched successfully"
+                )
+            );
+    }
     const skip = (page - 1) * limit;
     const subscriptions = await Subscription.find({
         channel: channelId,
@@ -62,6 +91,7 @@ const getUserChannelSubscribers = asyncHandler(async (req, res) => {
         .populate("subscriber", "username avatar")
         .select("-channel");
     if (!subscriptions) throw new ApiError(404, "No subscriptions found");
+    await redisClient.set(key, JSON.stringify(subscriptions), "EX", 60);
     res.status(200).json(
         new ApiResonse(
             200,

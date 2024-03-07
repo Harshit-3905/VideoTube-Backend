@@ -4,6 +4,7 @@ import asyncHandler from "../utils/asyncHandler.js";
 import { Video } from "../models/video.model.js";
 import { Comment } from "../models/comment.model.js";
 import mongoose from "mongoose";
+import { redisClient } from "../utils/redis.js";
 
 const getVideoComments = asyncHandler(async (req, res) => {
     const { videoId } = req.params;
@@ -11,6 +12,20 @@ const getVideoComments = asyncHandler(async (req, res) => {
     const limit = parseInt(req.query.limit) || 10;
     if (page < 1) throw new ApiError(400, "Invalid page number");
     if (limit < 1) throw new ApiError(400, "Invalid limit number");
+    const key = `comments:${videoId}:${page}:${limit}`;
+    const cached = await redisClient.get(key);
+    if (cached) {
+        const comments = JSON.parse(cached);
+        return res
+            .status(200)
+            .json(
+                new ApiResonse(
+                    200,
+                    { comments },
+                    "Comments fetched successfully"
+                )
+            );
+    }
     const skip = (page - 1) * limit;
     if (!mongoose.Types.ObjectId.isValid(videoId))
         throw new ApiError(400, "Invalid Video ID");
@@ -22,6 +37,8 @@ const getVideoComments = asyncHandler(async (req, res) => {
             avatar: 1,
         })
         .select("-video");
+    if (!comments) throw new ApiError(404, "No comments found");
+    await redisClient.set(key, JSON.stringify(comments), "EX", 60);
     res.status(200).json(new ApiResonse(200, comments, "Comments fetched"));
 });
 

@@ -2,6 +2,7 @@ import ApiError from "../utils/ApiError.js";
 import ApiResponse from "../utils/ApiResponse.js";
 import asyncHandler from "../utils/asyncHandler.js";
 import { Like } from "../models/like.model.js";
+import { redisClient } from "../utils/redis.js";
 
 const toggleVideoLike = asyncHandler(async (req, res) => {
     const { videoId } = req.params;
@@ -48,6 +49,20 @@ const getLikedVideos = asyncHandler(async (req, res) => {
     const limit = parseInt(req.query.limit) || 10;
     if (page < 1) throw new ApiError(400, "Invalid page number");
     if (limit < 1) throw new ApiError(400, "Invalid limit number");
+    const key = `likedVideos:${_id}:${page}:${limit}`;
+    const cached = await redisClient.get(key);
+    if (cached) {
+        const videos = JSON.parse(cached);
+        return res
+            .status(200)
+            .json(
+                new ApiResponse(
+                    200,
+                    { videos },
+                    "Liked videos fetched successfully"
+                )
+            );
+    }
     const skip = (page - 1) * limit;
     const likes = await Like.find({
         likedBy: _id,
@@ -64,6 +79,7 @@ const getLikedVideos = asyncHandler(async (req, res) => {
             },
         });
     if (!likes) throw new ApiError(500, "Something went wrong");
+    await redisClient.set(key, JSON.stringify(likes), "EX", 60);
     res.status(200).json(new ApiResponse(200, likes, "Fetched Liked videos"));
 });
 
