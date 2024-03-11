@@ -2,7 +2,10 @@ import { Redis } from "ioredis";
 
 let redisClient = null;
 export default function connectRedis() {
-    const client = new Redis();
+    const client = new Redis({
+        host: "redis",
+        port: 6379,
+    });
     client.on("connect", () => {
         console.log("Redis connected");
     });
