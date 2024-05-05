@@ -18,24 +18,40 @@ const getAllVideos = asyncHandler(async (req, res) => {
     const key = `videos:${page}:${limit}`;
     const cached = await redisClient.get(key);
     if (cached) {
-        const videos = JSON.parse(cached);
+        const { videos, hasNextPage } = JSON.parse(cached);
         return res
             .status(200)
             .json(
-                new ApiResonse(200, { videos }, "Videos fetched successfully")
+                new ApiResonse(
+                    200,
+                    { videos, hasNextPage },
+                    "Videos fetched successfully"
+                )
             );
     }
     const skip = (page - 1) * limit;
     const videos = await Video.find({ isPublished: true })
         .skip(skip)
-        .limit(limit)
+        .limit(limit + 1)
         .populate("owner", {
             username: 1,
             avatar: 1,
         });
+    let hasNextPage = false;
+    if (videos.length > limit) {
+        hasNextPage = true;
+        videos.pop();
+    }
     if (!videos) throw new ApiError(404, "No videos found");
-    await redisClient.set(key, JSON.stringify(videos), "EX", 60);
-    res.status(200).json(new ApiResonse(200, videos, "Videos found"));
+    await redisClient.set(
+        key,
+        JSON.stringify({ videos, hasNextPage }),
+        "EX",
+        60
+    );
+    res.status(200).json(
+        new ApiResonse(200, { videos, hasNextPage }, "Videos found")
+    );
 });
 
 const getVideoById = asyncHandler(async (req, res) => {
@@ -56,8 +72,8 @@ const getVideoById = asyncHandler(async (req, res) => {
         avatar: 1,
     });
     if (!video) throw new ApiError(404, "Video not found");
-    const watchHistory = req.user.watchHistory;
-    if (!watchHistory.includes(videoId)) {
+    const watchHistory = req.user?.watchHistory;
+    if (watchHistory && !watchHistory?.includes(videoId)) {
         const user = await User.findById(req.user._id);
         user.watchHistory.push(videoId);
         video.views += 1;
@@ -81,8 +97,8 @@ const publishVideo = asyncHandler(async (req, res) => {
     const videoFile = await uploadOnCloudinary(videoFileLocalPath);
     const thumbnail = await uploadOnCloudinary(thumbnailLocalPath);
     const video = await Video.create({
-        videoFile: videoFile.url,
-        thumbnail: thumbnail.url,
+        videoFile: videoFile.secure_url,
+        thumbnail: thumbnail.secure_url,
         title,
         description,
         duration: videoFile.duration,
