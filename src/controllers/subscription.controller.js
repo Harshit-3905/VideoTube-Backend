@@ -3,8 +3,9 @@ import ApiResonse from "../utils/ApiResponse.js";
 import asyncHandler from "../utils/asyncHandler.js";
 import { Subscription } from "../models/subscription.model.js";
 import { redisClient } from "../utils/redis.js";
+
 const getSubscribedChannels = asyncHandler(async (req, res) => {
-    const userId = req.user._id;
+    const userId = req.params.userId || req.user._id;
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
     if (page < 1) throw new ApiError(400, "Invalid page number");
