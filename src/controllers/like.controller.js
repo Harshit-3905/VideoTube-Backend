@@ -52,15 +52,11 @@ const getLikedVideos = asyncHandler(async (req, res) => {
     const key = `likedVideos:${_id}:${page}:${limit}`;
     const cached = await redisClient.get(key);
     if (cached) {
-        const videos = JSON.parse(cached);
+        const data = JSON.parse(cached);
         return res
             .status(200)
             .json(
-                new ApiResponse(
-                    200,
-                    { videos },
-                    "Liked videos fetched successfully"
-                )
+                new ApiResponse(200, data, "Liked videos fetched successfully")
             );
     }
     const skip = (page - 1) * limit;

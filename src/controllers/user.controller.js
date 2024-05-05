@@ -65,8 +65,8 @@ const registerUser = asyncHandler(async (req, res) => {
         email,
         username: username.toLowerCase(),
         password,
-        avatar: avatar.url,
-        coverImage: coverImage?.url || "",
+        avatar: avatar.secure_url,
+        coverImage: coverImage?.secure_url || "",
     });
     const createdUser = await User.findById(user._id).select(
         "-password -refreshToken"
@@ -116,7 +116,7 @@ const loginUser = asyncHandler(async (req, res) => {
         .json(
             new ApiResponse(
                 200,
-                { loggedInUser, accessToken, refreshToken },
+                { user, accessToken, refreshToken },
                 "User Logged In Successfully"
             )
         );
