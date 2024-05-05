@@ -21,14 +21,14 @@ const createTweet = asyncHandler(async (req, res) => {
 });
 
 const getUserTweets = asyncHandler(async (req, res) => {
-    let { username } = req.params;
+    let { userId } = req.params;
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
     if (page < 1) throw new ApiError(400, "Invalid page number");
     if (limit < 1) throw new ApiError(400, "Invalid limit number");
     const skip = (page - 1) * limit;
     const allTweets = await redisClient.get(
-        `tweets:${username}:${page}:${limit}`
+        `tweets:${userId}:${page}:${limit}`
     );
     if (allTweets) {
         return res
@@ -41,17 +41,16 @@ const getUserTweets = asyncHandler(async (req, res) => {
                 )
             );
     }
-    const user = await User.findOne({ username });
+    const user = await User.findOne({ _id: userId });
     if (!user) {
         throw new ApiError(404, "User not found");
     }
-    const userId = user._id;
     const tweets = await Tweet.find({ owner: userId }).skip(skip).limit(limit);
     if (!tweets) {
         throw new ApiError(500, "Something went wrong");
     }
     await redisClient.set(
-        `tweets:${username}:${page}:${limit}`,
+        `tweets:${userId}:${page}:${limit}`,
         JSON.stringify(tweets),
         "EX",
         60
